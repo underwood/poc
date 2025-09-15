@@ -1,5 +1,5 @@
 export type AudioStreamCallbacks = {
-  onChunk: (chunk: ArrayBufferLike) => void;
+  onChunk: (chunk: ArrayBufferView | ArrayBufferLike) => void;
   onError?: (error: unknown) => void;
 };
 
@@ -60,7 +60,7 @@ export function createMicrophonePcmStream(callbacks: AudioStreamCallbacks): Audi
             lastEmitTime = now;
             const pcm = floatTo16BitPCM(frame);
             try {
-              callbacks.onChunk(pcm.buffer);
+              callbacks.onChunk(pcm);
             } catch (err) {
               callbacks.onError?.(err);
             }
