@@ -1,5 +1,5 @@
 export type AudioStreamCallbacks = {
-  onChunk: (chunk: ArrayBuffer) => void;
+  onChunk: (chunk: ArrayBufferLike) => void;
   onError?: (error: unknown) => void;
 };
 

@@ -8,7 +8,7 @@ export type ServerMessage = TranscriptMessage | { type: 'error'; message: string
 
 export type WebSocketClient = {
   connect: () => Promise<void>;
-  sendAudioChunk: (chunk: ArrayBuffer) => void;
+  sendAudioChunk: (chunk: ArrayBufferLike) => void;
   close: () => void;
   isOpen: () => boolean;
 };
@@ -51,9 +51,11 @@ export function createWebSocketClient(url: string, onMessage: (msg: ServerMessag
     return openPromise;
   }
 
-  function sendAudioChunk(chunk: ArrayBuffer) {
+  function sendAudioChunk(chunk: ArrayBufferLike) {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(chunk);
+      // Wrap in a typed array to satisfy WebSocket.send's ArrayBufferView overload
+      const view = new Uint8Array(chunk);
+      socket.send(view);
     }
   }
 
