@@ -1,0 +1,15 @@
+:root{color-scheme:light dark}
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;line-height:1.4}
+.container{max-width:900px;margin:0 auto;padding:24px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card{border:1px solid color-mix(in oklab, canvas, canvasText 12%);border-radius:12px;padding:16px}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}
+.badge{padding:4px 8px;border-radius:999px;border:1px solid color-mix(in oklab, canvas, canvasText 12%);font-size:.85rem}
+textarea{width:100%;min-height:220px;padding:12px;border-radius:8px;border:1px solid color-mix(in oklab, canvas, canvasText 12%);background:transparent;color:inherit}
+button{padding:10px 14px;border-radius:8px;border:1px solid color-mix(in oklab, canvas, canvasText 12%);background:transparent;color:inherit;cursor:pointer}
+button.primary{background:color-mix(in oklab, canvas, canvasText 8%)}
+.status{font-size:.9rem;opacity:.8}
+.small{font-size:.85rem;opacity:.9}
+.log{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:.9rem;white-space:pre-wrap}
