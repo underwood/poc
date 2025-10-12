@@ -27,10 +27,20 @@ export function createMicrophonePcmStream(callbacks: AudioStreamCallbacks): Audi
   async function start() {
     if (running) return;
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 }, video: false });
+      // Request mono audio with processing enabled for best accuracy
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,           // Mono input
+          echoCancellation: true,    // Remove echo and feedback
+          autoGainControl: true,     // Normalize volume levels
+          noiseSuppression: true,    // Remove background noise
+          sampleRate: 48000          // Higher quality capture
+        },
+        video: false
+      });
       audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 48000 });
       sourceNode = audioContext.createMediaStreamSource(mediaStream);
-      processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processor = audioContext.createScriptProcessor(4096, 1, 1);  // 1 input channel, 1 output channel
 
       sourceNode.connect(processor);
       processor.connect(audioContext.destination);
@@ -40,9 +50,13 @@ export function createMicrophonePcmStream(callbacks: AudioStreamCallbacks): Audi
 
       processor.onaudioprocess = (event: AudioProcessingEvent) => {
         if (!running) return;
-        const input = event.inputBuffer.getChannelData(0);
-        // Resample from context sample rate to 16kHz
-        const resampled = resampleLinear(input, audioContext!.sampleRate, TARGET_SAMPLE_RATE);
+
+        // Get mono channel
+        const monoChannel = event.inputBuffer.getChannelData(0);
+
+        // Resample mono from context sample rate to 16kHz
+        const resampled = resampleLinear(monoChannel, audioContext!.sampleRate, TARGET_SAMPLE_RATE);
+
         // Append to buffer
         const concat = new Float32Array(resampleBuffer.length + resampled.length);
         concat.set(resampleBuffer, 0);
@@ -51,6 +65,7 @@ export function createMicrophonePcmStream(callbacks: AudioStreamCallbacks): Audi
 
         const now = performance.now();
         if (now - lastEmitTime >= FRAME_DURATION_MS) {
+          // For mono, samples per frame is just sample rate * duration
           const samplesPerFrame = Math.round((TARGET_SAMPLE_RATE * FRAME_DURATION_MS) / 1000);
           const framesToEmit = Math.floor(resampleBuffer.length / samplesPerFrame);
           if (framesToEmit > 0) {

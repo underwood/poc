@@ -1,10 +1,45 @@
+export type WordData = {
+  word: string;
+  start: number;
+  end: number;
+  speaker: number | null;
+};
+
 export type TranscriptMessage = {
   type: 'transcript';
   text: string;
   is_final?: boolean;
+  words?: WordData[];
+  speaker?: number;
 };
 
-export type ServerMessage = TranscriptMessage | { type: 'error'; message: string };
+export type ThoughtSegment = {
+  id: string;
+  speaker: string;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+};
+
+export type ThoughtsMessage = {
+  type: 'thoughts';
+  data: {
+    segments: ThoughtSegment[];
+  };
+};
+
+export type ThoughtUpdateMessage = {
+  type: 'thought_update';
+  thought_id: string;
+  sequence: number;
+  speaker: string;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  is_final: boolean;
+};
+
+export type ServerMessage = TranscriptMessage | ThoughtsMessage | ThoughtUpdateMessage | { type: 'error'; message: string };
 
 export type WebSocketClient = {
   connect: () => Promise<void>;
