@@ -8,7 +8,6 @@ from typing import Any
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-import requests
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
