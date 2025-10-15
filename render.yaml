@@ -1,12 +1,11 @@
 services:
   - type: web
     name: interview-assistant-api
-    runtime: python
-    plan: starter
+    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: 3.11.0
       - key: DEEPGRAM_API_KEY
         sync: false
