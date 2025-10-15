@@ -167,7 +167,7 @@ class SpeakerSmoother:
         return self.current_speaker
 
 
-# Phase 3: Sentence boundary detection and windowing for OpenAI
+# Phase 3: Sentence boundary detection (legacy - not currently used)
 
 class SentenceBoundaryDetector:
     """Hybrid sentence boundary detection using punctuation, pauses, and heuristics."""
@@ -345,183 +345,7 @@ class WindowManager:
         return window
 
 
-# Phase 4: Fast OpenAI text cleaning
-
-async def clean_text_with_openai(text: str, session_id: str) -> str | None:
-    """
-    Clean transcript text with OpenAI - remove filler words, fix grammar.
-    Optimized for speed with minimal prompt and gpt-4o-mini.
-    """
-    import openai
-
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not openai_key or openai_key == "your_openai_key_here":
-        return None
-
-    if not text.strip():
-        return None
-
-    try:
-        client = openai.AsyncOpenAI(api_key=openai_key)
-
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Remove ONLY filler words (um, uh, like, you know, I mean) from the transcript. Do NOT change any other words. Do NOT fix grammar. Do NOT rephrase. Keep everything else exactly as spoken. Output only the text with filler words removed."
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-            temperature=0.0,  # Zero temperature for consistency
-            max_tokens=500,
-        )
-
-        cleaned = response.choices[0].message.content
-        if cleaned:
-            print(f"[session {session_id}] OpenAI cleaned: '{text[:50]}...' → '{cleaned[:50]}...'", flush=True)
-            return cleaned.strip()
-
-    except Exception as e:
-        print(f"[session {session_id}] OpenAI cleaning error: {e}", flush=True)
-        return None
-
-    return None
-
-
-# Phase 4: OpenAI integration for structured output (legacy, not used)
-
-async def process_sentences_into_thoughts(
-    sentences: list[dict[str, Any]], 
-    session_id: str,
-    prior_segments: list[dict[str, Any]] = None,
-    max_segments: int = 5,
-    min_gap_ms: int = 1200,
-    include_keywords: bool = True
-) -> dict[str, Any] | None:
-    """
-    Process finalized sentences with OpenAI to group them into coherent 'thoughts'.
-    
-    Args:
-        sentences: List of sentence dicts with {text, start, end, speaker}
-        session_id: Current session ID for logging
-        prior_segments: Optional list of recent segment summaries for context
-        max_segments: Maximum number of thought segments to create
-        min_gap_ms: Minimum gap in ms to prefer a new thought boundary
-        include_keywords: Whether to include keywords in output
-    
-    Returns:
-        Structured output dictionary with thought segments or None if OpenAI fails
-    """
-    import openai
-    
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not openai_key or openai_key == "your_openai_key_here":
-        print(f"[session {session_id}] No OpenAI API key configured, skipping structured output")
-        return None
-    
-    if not sentences:
-        return {"segments": []}
-    
-    # Convert sentences to the format expected by OpenAI (with milliseconds and speaker)
-    formatted_sentences = []
-    for sent in sentences:
-        speaker = sent.get("speaker")
-        speaker_label = f"Speaker {speaker}" if speaker is not None else "Unknown"
-        formatted_sentences.append({
-            "speaker": speaker_label,
-            "text": sent.get("text", ""),
-            "start_ms": int(sent.get("start", 0.0) * 1000),
-            "end_ms": int(sent.get("end", 0.0) * 1000)
-        })
-    
-    # Format prior segments for context (if any)
-    prior_context = prior_segments if prior_segments else []
-    print("YO DONE PRE CALL")
-    
-    # Build the system prompt
-    system_prompt = """You are a transcript post-processor.
-Your job is to group finalized transcript sentences into coherent "thoughts" (short, self-contained segments of speech).
-
-Rules:
-1. Do not invent timestamps. Use the provided start_ms and end_ms from input sentences only.
-2. Prefer semantic boundaries (topic shift, question/answer change) and timing gaps when forming thoughts.
-3. Merge adjacent sentences from the SAME speaker that clearly express a single idea into one thought.
-4. When a speaker changes, start a new thought segment.
-5. Clean up filler words (um, uh, like) and fix obvious grammar issues while preserving meaning.
-6. Format the output text as "Speaker X: [cleaned text]" where X is the speaker number.
-7. If a segment obviously continues the previous thought by the same speaker, extend that thought rather than creating a new one.
-8. Output valid JSON that conforms exactly to the provided schema. No extra text.
-9. If input is empty, return {"segments": []}.
-"""
-    
-    # Build the user prompt
-    user_prompt = f"""Group the following finalized transcript sentences into thought segments. Use the JSON schema below.
-Use the following constraints to guide boundaries:
-
-max_segments: {max_segments}
-min_gap_ms_for_new_thought: {min_gap_ms} (if a gap between consecutive sentences ≥ this value, prefer a new thought)
-
-Prior context (optional, may be empty):
-prior_segments: {json.dumps(prior_context)}
-(Each object has {{id, text}}; use only to maintain continuity—do not copy timestamps.)
-
-Sentences (final only):
-{json.dumps(formatted_sentences, indent=2)}
-
-JSON Schema (must conform exactly):
-{{
-  "type": "object",
-  "required": ["segments"],
-  "properties": {{
-    "segments": {{
-      "type": "array",
-      "items": {{
-        "type": "object",
-        "required": ["id","speaker","text","start_ms","end_ms"],
-        "properties": {{
-          "id": {{ "type": "string" }},
-          "speaker": {{ "type": "string" }},
-          "text": {{ "type": "string" }},
-          "start_ms": {{ "type": "integer", "minimum": 0 }},
-          "end_ms": {{ "type": "integer", "minimum": 0 }}
-        }}
-      }}
-    }}
-  }}
-}}
-
-Output:
-Return only a JSON object that matches the schema. No narration."""
-
-    try:
-        client = openai.AsyncOpenAI(api_key=openai_key)
-        
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,  # Low temperature for consistent structure
-        )
-        
-        result_text = response.choices[0].message.content
-        if result_text:
-            structured_output = json.loads(result_text)
-            print(f"[session {session_id}] OpenAI grouped {len(sentences)} sentences into {len(structured_output.get('segments', []))} thoughts")
-            return structured_output
-        
-    except Exception as e:
-        print(f"[session {session_id}] OpenAI error: {e}")
-        return None
-    
-    return None
-print("YO DONE PROCESS SENTENCES INTO THOUGHTS")
+# Phase 4: Removed OpenAI integration (not needed - Deepgram handles filler words and formatting)
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
@@ -682,7 +506,7 @@ async def stream(websocket: WebSocket) -> None:
                     # Use most common speaker in this segment
                     speaker = max(set(speakers), key=speakers.count)
         
-        # Phase 3: Track thoughts in real-time with OpenAI cleaning
+        # Phase 3: Track thoughts in real-time
         if is_final and text.strip() and speaker is not None:
             print(f"[session {session_id}] Final transcript - text: '{text}', speaker: {speaker}", flush=True)
 
